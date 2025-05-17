@@ -366,8 +366,7 @@ services:
     depends_on:
       vector:
         condition: service_healthy
-    ports:
-      - "54322:5432"
+    
     command:
       - postgres
       - -c
