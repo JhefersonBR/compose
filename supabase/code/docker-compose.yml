@@ -75,9 +75,7 @@ services:
   auth:
     image: supabase/gotrue:v2.164.0
     depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
       analytics:
         condition: service_healthy
     healthcheck:
@@ -161,9 +159,7 @@ services:
   rest:
     image: postgrest/postgrest:v12.2.0
     depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
       analytics:
         condition: service_healthy
     restart: unless-stopped
@@ -181,9 +177,7 @@ services:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
     image: supabase/realtime:v2.33.58
     depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
       analytics:
         condition: service_healthy
     healthcheck:
@@ -224,9 +218,7 @@ services:
   storage:
     image: supabase/storage-api:v1.11.13
     depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
       rest:
         condition: service_started
       imgproxy:
@@ -281,9 +273,7 @@ services:
   meta:
     image: supabase/postgres-meta:v0.84.2
     depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
       analytics:
         condition: service_healthy
     restart: unless-stopped
@@ -324,10 +314,7 @@ services:
       interval: 5s
       retries: 10
     restart: unless-stopped
-    depends_on:
-      db:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      
     # Uncomment to use Big Query backend for analytics
     # volumes:
     #   - type: bind
