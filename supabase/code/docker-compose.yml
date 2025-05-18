@@ -75,7 +75,9 @@ services:
   auth:
     image: supabase/gotrue:v2.164.0
     depends_on:
-      
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
       analytics:
         condition: service_healthy
     healthcheck:
@@ -159,7 +161,9 @@ services:
   rest:
     image: postgrest/postgrest:v12.2.0
     depends_on:
-      
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
       analytics:
         condition: service_healthy
     restart: unless-stopped
@@ -177,7 +181,9 @@ services:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
     image: supabase/realtime:v2.33.58
     depends_on:
-      
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
       analytics:
         condition: service_healthy
     healthcheck:
@@ -201,7 +207,7 @@ services:
       PORT: 4000
       DB_HOST: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
-      DB_USER: ${POSTGRES_USER}
+      DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
@@ -218,7 +224,9 @@ services:
   storage:
     image: supabase/storage-api:v1.11.13
     depends_on:
-      
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
       rest:
         condition: service_started
       imgproxy:
@@ -273,7 +281,9 @@ services:
   meta:
     image: supabase/postgres-meta:v0.84.2
     depends_on:
-      
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
       analytics:
         condition: service_healthy
     restart: unless-stopped
@@ -282,7 +292,7 @@ services:
       PG_META_DB_HOST: ${POSTGRES_HOST}
       PG_META_DB_PORT: ${POSTGRES_PORT}
       PG_META_DB_NAME: ${POSTGRES_DB}
-      PG_META_DB_USER: ${POSTGRES_USER}
+      PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
   functions:
@@ -314,7 +324,10 @@ services:
       interval: 5s
       retries: 10
     restart: unless-stopped
-      
+    depends_on:
+      db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
     # Uncomment to use Big Query backend for analytics
     # volumes:
     #   - type: bind
@@ -323,19 +336,19 @@ services:
     #     read_only: true
     environment:
       LOGFLARE_NODE_HOST: 127.0.0.1
-      DB_USERNAME: ${POSTGRES_USER}
-      DB_DATABASE: ${POSTGRES_DB}
+      DB_USERNAME: supabase_admin
+      DB_DATABASE: _supabase
       DB_HOSTNAME: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_SCHEMA: _analytics
       LOGFLARE_API_KEY: ${LOGFLARE_API_KEY}
       LOGFLARE_SINGLE_TENANT: true
-      LOGFLARE${POSTGRES_DB}_MODE: true
+      LOGFLARE_SUPABASE_MODE: true
       LOGFLARE_MIN_CLUSTER_SIZE: 1
 
       # Comment variables to use Big Query backend for analytics
-      POSTGRES_BACKEND_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/_supabase
       POSTGRES_BACKEND_SCHEMA: _analytics
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
       # Uncomment to use Big Query backend for analytics
@@ -353,7 +366,6 @@ services:
     depends_on:
       vector:
         condition: service_healthy
-  
     command:
       - postgres
       - -c
@@ -361,12 +373,6 @@ services:
       - -c
       - log_min_messages=fatal # prevents Realtime polling queries from appearing in logs
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.tcp.routers.pg.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.pg.entrypoints=postgres"
-      - "traefik.tcp.routers.pg.service=pg"
-      - "traefik.tcp.services.pg.loadbalancer.server.port=5432"
     environment:
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: ${POSTGRES_PORT}
@@ -388,7 +394,7 @@ services:
       # PGDATA directory is persisted between restarts
       - ./volumes/db/data:/var/lib/postgresql/data:Z
       # Changes required for internal supabase data such as _analytics
-      - ./volumes/db/${POSTGRES_DB}.sql:/docker-entrypoint-initdb.d/migrations/97-${POSTGRES_DB}.sql:Z
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
       # Changes required for Analytics support
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
       # Changes required for Pooler support
@@ -428,6 +434,8 @@ services:
       timeout: 5s
       retries: 5
     depends_on:
+      db:
+        condition: service_healthy
       analytics:
         condition: service_healthy
     command:
@@ -441,7 +449,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - DATABASE_URL=ecto://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
+      - DATABASE_URL=ecto://supabase_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/_supabase
       - CLUSTER_POSTGRES=true
       - SECRET_KEY_BASE=UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
       - VAULT_ENC_KEY=your-encryption-key-32-chars-min
@@ -453,6 +461,12 @@ services:
       - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE}
       - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN}
       - POOLER_POOL_MODE=transaction
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.pg.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.pg.entrypoints=postgres"
+      - "traefik.tcp.routers.pg.service=pg"
+      - "traefik.tcp.services.pg.loadbalancer.server.port=5432"
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
 
